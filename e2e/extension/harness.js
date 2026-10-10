@@ -2,6 +2,7 @@
 // extension, so foxvoice runs with the real Firefox media and speech APIs.
 import { whisper } from "../../src/browser/index.ts";
 import { createVoice, decodeAudio, openMic, speak, transcriptionServer } from "../../src/index.ts";
+import { said, spyOnSpeech } from "./spy.js";
 import { useWavMic, wavMic } from "./wav-mic.js";
 
 const realGetUserMedia = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
@@ -38,22 +39,7 @@ async function heard(provider, audio) {
   }
 }
 
-// Record every speechSynthesis.speak call, so the test can assert what was
-// said. speak() uses a new hidden iframe for each text, so watch each one.
-const said = [];
-const append = document.body.append.bind(document.body);
-document.body.append = (...nodes) => {
-  append(...nodes);
-  for (const node of nodes) {
-    const synth = node instanceof HTMLIFrameElement ? node.contentWindow?.speechSynthesis : undefined;
-    if (!synth) continue;
-    const real = synth.speak.bind(synth);
-    synth.speak = (utterance) => {
-      said.push({ text: utterance.text, voice: utterance.voice?.name, lang: utterance.lang });
-      real(utterance);
-    };
-  }
-};
+spyOnSpeech();
 
 window.fv = {
   /**

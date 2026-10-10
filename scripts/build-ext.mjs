@@ -4,7 +4,7 @@
 // --e2e builds dist-e2e/: the same plus the harness page, the WAV
 // microphone and the test audio from e2e/extension/ (never in dist-ext/).
 // Scripts are ES modules: pages load them with <script type="module">.
-import { cpSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync } from "node:fs";
+import { cpSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { build } from "esbuild";
 
@@ -26,11 +26,20 @@ for (const dir of dirs) {
     outdir: out,
     bundle: true,
     format: "esm",
+    // transformers.js loads with a dynamic import, so it lands in its own
+    // chunk under vendor/. lint:ext skips vendor/ and ort/: both evaluate strings.
+    splitting: true,
+    chunkNames: "vendor/[name]-[hash]",
     target: "firefox153",
     logLevel: "warning",
   });
   // amo-metadata.json is the AMO listing, not a part of the add-on.
   for (const file of files.filter((f) => !f.endsWith(".js") && f !== "amo-metadata.json")) cpSync(`${dir}/${file}`, `${out}/${file}`, { recursive: true });
+}
+// The E2E build loads the test hooks in the demo panel before panel.js.
+if (e2e) {
+  const panel = readFileSync(`${out}/panel.html`, "utf8");
+  writeFileSync(`${out}/panel.html`, panel.replace('<script type="module" src="panel.js">', '<script type="module" src="panel-hooks.js"></script>\n    <script type="module" src="panel.js">'));
 }
 // ONNX Runtime's WASM files ship in the extension: MV3 allows no remote code.
 const ort = join(dirname(dirname(realpathSync("node_modules/@huggingface/transformers"))), "onnxruntime-web", "dist");
