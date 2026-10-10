@@ -100,3 +100,11 @@ Words used here:
 | D3 | No local model server runs. | The reply says so plainly and repeats what it heard. It names who answered. | E2E |
 | D4 | A local model server runs. | foxmind sends the transcript to it, and the panel speaks the reply. | E2E with a fake llama-server |
 | D5 | The user holds Space on the button. | Space works as push to talk. | E2E |
+
+## The E2E test itself (H)
+
+| # | Failure mode | Wanted behaviour | Test |
+|---|---|---|---|
+| H1 | The machine has no audio output device (a Linux CI runner). Firefox's AudioContext stays suspended and `resume()` never settles, so a WAV microphone built on it never plays and the page call waits for ever. | The WAV microphone captures an `<audio>` element (`mozCaptureStream`), which plays on a system clock without a device. | E2E in a Linux container with no sound server |
+| H2 | A page call in the E2E test does not settle. | The call fails within its own time limit, with the name of the call, not with Puppeteer's protocol timeout. | E2E |
+| H3 | A check needs something this machine does not have (speech voices, `whisper-server`). | Skip the check with a `SKIP <check>: <reason>` log line, also in the artifact. Never hang. | E2E on Linux |
