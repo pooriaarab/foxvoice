@@ -1,6 +1,4 @@
-// Fakes for the browser media APIs, so the microphone code runs in Node.
-// They copy only the parts foxvoice uses: tracks that stop and end, a
-// recorder that gives one Blob at stop, and getUserMedia.
+// Fakes for the parts of the browser media APIs that foxvoice uses, for Node.
 
 export class FakeTrack extends EventTarget {
   readyState: "live" | "ended" = "live";
@@ -71,7 +69,6 @@ export function fakeMedia(audio: Float32Array = tone(1000)) {
   return { media, streams };
 }
 
-/** A getUserMedia that fails with the DOMException name a browser uses. */
 export function refusing(name: string) {
   return async () => {
     throw new DOMException(`fake ${name}`, name);
