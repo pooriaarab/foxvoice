@@ -47,6 +47,8 @@ try {
   check("first speak() in a fresh page: one call, ends, local voice (T2)", spoke.voices === 0 ? spoke.code === "no_voice" && spoke.said.length === 0 : spoke.local === true && spoke.said.length === 1 && spoke.said[0].text === "Your calendar is open.", spoke);
   const cancelled = await run("speak", "This is a long answer that the user stops before it ends, because they already know the rest of it.", "cancel");
   check("cancel stops the speech: aborted, nothing speaking (T5)", spoke.voices === 0 || (cancelled.code === "aborted" && cancelled.speaking === false), { code: cancelled.code, speaking: cancelled.speaking, ms: cancelled.ms });
+  const after = await run("speak", "Done.");
+  check("speak() after a cancel still speaks (T9)", spoke.voices === 0 || after.local === true, { voice: after.voice, code: after.code, ms: after.ms });
 
   const env = await run("env");
   check("extension page has no SharedArrayBuffer (W4)", env.crossOriginIsolated === false && env.sharedArrayBuffer === "undefined", env);

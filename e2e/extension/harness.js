@@ -53,6 +53,8 @@ window.fv = {
     if (how === "cancel") setTimeout(() => controller.abort(), 300);
     const started = performance.now();
     const result = await speak(text, { signal: controller.signal }).catch((error) => ({ code: error.code, message: error.message }));
+    // Firefox updates speechSynthesis.speaking a moment after cancel().
+    if (how === "cancel") await wait(300);
     return { ...result, ms: Math.round(performance.now() - started), said: said.slice(), speaking: speechSynthesis.speaking, voices: speechSynthesis.getVoices().length };
   },
   /** Load models from the test's local hub. */
