@@ -1,6 +1,2 @@
-// The demo's background script (an event page in Firefox MV3). The E2E test
-// reads this value back through popup.html. Replace it with code that runs
-// foxvoice.
-browser.runtime.onInstalled.addListener(() => {
-  browser.storage.local.set({ fixture: "installed" });
-});
+// The toolbar button opens and closes the push-to-talk sidebar.
+browser.action.onClicked.addListener(() => browser.sidebarAction.toggle());
