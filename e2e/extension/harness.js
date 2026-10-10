@@ -1,7 +1,7 @@
 // The E2E harness page. e2e/run.mjs calls window.fv.* here, in the
 // extension, so foxvoice runs with the real Firefox media and speech APIs.
 import { whisper } from "../../src/browser/index.ts";
-import { decodeAudio, openMic, speak } from "../../src/index.ts";
+import { createVoice, decodeAudio, openMic, speak, transcriptionServer } from "../../src/index.ts";
 import { useWavMic, wavMic } from "./wav-mic.js";
 
 const realGetUserMedia = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
@@ -56,6 +56,27 @@ document.body.append = (...nodes) => {
 };
 
 window.fv = {
+  /**
+   * createVoice on the WAV microphone. A cloud server (the test's trap) is
+   * first in the list; private mode must never call it. With "barge-in",
+   * a long reply is speaking when listen() starts.
+   */
+  async voice(trapUrl, how) {
+    useWavMic("jfk.wav");
+    const voice = createVoice({ stt: [transcriptionServer({ baseURL: trapUrl, tier: "cloud" }), whisper({ remoteHost: hub })] });
+    const states = [];
+    voice.on("state", (state) => states.push(state));
+    let speech;
+    if (how === "barge-in") {
+      speech = voice.speak("This is a long reply that keeps going while the user starts to speak again.").catch((error) => error.code);
+      await wait(800);
+    }
+    const listening = voice.listen();
+    await wavMic.ended;
+    voice.stop();
+    const heard = await listening;
+    return { ...heard, states, speech: await speech, frames: document.querySelectorAll("iframe").length, track: trackState() };
+  },
   /** speak() with the real engine; "cancel" aborts it after 300 ms. */
   async speak(text, how) {
     const controller = new AbortController();
