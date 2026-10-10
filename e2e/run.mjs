@@ -3,6 +3,7 @@
 // microphone a known WAV file, and writes artifacts/e2e-<date>.json with
 // every check and timing.
 // Usage: pnpm e2e [--headed]. Env: FIREFOX (the Firefox binary).
+import { createServer } from "node:http";
 import { launch, writeArtifact } from "create-foxkit/e2e";
 import { startHub, wordErrorRate } from "./hub.mjs";
 import { runNode } from "./node.mjs";
@@ -33,6 +34,17 @@ const PREFS = {
 const JFK = "And so my fellow Americans, ask not what your country can do for you, ask what you can do for your country.";
 
 const hub = await startHub();
+/** A server that stands for a cloud speech service and counts what reaches it. */
+async function startTrap() {
+  const requests = [];
+  const server = createServer((req, res) => {
+    requests.push(req.url);
+    res.writeHead(200, { "content-type": "application/json", "access-control-allow-origin": "*" }).end('{"text":"the trap heard it"}');
+  });
+  await new Promise((done) => server.listen(0, "127.0.0.1", done));
+  return { url: `http://127.0.0.1:${server.address().port}/v1`, requests, close: () => new Promise((done) => server.close(done)) };
+}
+
 let fox;
 try {
   await runNode(record, check, JFK);
@@ -89,6 +101,12 @@ try {
   hub.state.cut = false;
   const again = await run("whisper", "cut-again");
   check("downloads cut in half give download_failed, the next call downloads again (W1)", cut.code === "download_failed" && again.text, { first: cut.code, again: again.text });
+  const trap = await startTrap();
+  const heard = await run("voice", trap.url, "barge-in");
+  check("createVoice: push to talk gives the jfk transcript from whisper in the browser", wordErrorRate(JFK, heard.text) <= 0.1 && heard.provider === "whisper" && heard.tier === "browser" && heard.track === "ended", { text: heard.text, provider: heard.provider, confidence: heard.confidence, audioMs: heard.audioMs, ms: heard.ms });
+  check("private mode: the cloud trap server got 0 requests and is listed as skipped (R1)", trap.requests.length === 0 && heard.skipped?.[0]?.code === "private_mode", { requests: trap.requests.length, skipped: heard.skipped });
+  check("listen() while it speaks stops the speech first (T8)", heard.speech === "aborted" && heard.frames === 0 && heard.states.join(",") === "speaking,listening,transcribing,idle", { speech: heard.speech, states: heard.states });
+  await trap.close();
   const noise = await run("whisper", "noise");
   check("noise gives confidence under 0.5 (W7)", noise.confidence < 0.5, { text: noise.text, confidence: noise.confidence });
   const long = await run("whisper", "long");
