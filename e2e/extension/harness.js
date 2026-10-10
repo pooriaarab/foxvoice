@@ -1,5 +1,6 @@
 // The E2E harness page. e2e/run.mjs calls window.fv.* here, in the
 // extension, so foxvoice runs with the real Firefox media and speech APIs.
+import { decodeAudio, openMic } from "../../src/index.ts";
 import { useWavMic, wavMic } from "./wav-mic.js";
 
 const realGetUserMedia = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
@@ -18,7 +19,34 @@ async function record(stream, until) {
   return new Blob(chunks);
 }
 
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const trackState = () => wavMic.tracks.at(-1)?.readyState;
+/** Run a promise and return its FoxvoiceError code, or "ok". */
+const outcome = (promise) => promise.then(() => "ok", (error) => error.code ?? String(error));
+
 window.fv = {
+  /** openMic on the WAV microphone, stopped the way the check asks. */
+  async mic(how) {
+    useWavMic("jfk.wav");
+    const levels = [];
+    const mic = await openMic({ maxMs: how === "limit" ? 3000 : 30000, onLevel: (level) => levels.push(level) });
+    if (how === "stop") {
+      await wavMic.ended;
+      mic.stop();
+    }
+    if (how === "cancel") {
+      await wait(1000);
+      mic.cancel();
+      return { outcome: await outcome(mic.done), track: trackState() };
+    }
+    const recording = await mic.done;
+    return { seconds: recording.ms / 1000, stoppedBy: recording.stoppedBy, samples: recording.audio.length, level: recording.level, levels: levels.length, track: trackState() };
+  },
+  /** The real decoder with bytes that are not audio. */
+  async badAudio() {
+    return outcome(decodeAudio(new Blob(["not audio"])));
+  },
+
   /** The harness facts the later checks build on. */
   async env() {
     return { crossOriginIsolated: globalThis.crossOriginIsolated, sharedArrayBuffer: typeof SharedArrayBuffer, mediaRecorder: typeof MediaRecorder };
