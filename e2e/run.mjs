@@ -9,6 +9,11 @@ import { runNode } from "./node.mjs";
 
 const record = { startedAt: new Date().toISOString(), checks: [], skipped: [], timings: {} };
 const check = (name, ok, actual) => record.checks.push({ name, ok: Boolean(ok), actual });
+/** A check that cannot run on this machine: say why in the log and the artifact, and go on. */
+const skip = (name, reason) => {
+  record.skipped.push({ name, reason });
+  console.log(`SKIP ${name}: ${reason}`);
+};
 /** Fail with the name of the call when a page call does not settle, not with Puppeteer's protocol timeout (H2). */
 const within = (promise, seconds, what) => {
   let timer;
@@ -44,9 +49,10 @@ try {
   // First, in the fresh page: Firefox fills the voice list late (T2).
   const spoke = await run("speak", "Your calendar is open.");
   record.tts = spoke;
+  if (spoke.voices === 0) skip("speech checks that need a voice (T2 speech, T5, T8, T9, demo speech)", "Firefox has no speech voices here, so speak() fails with no_voice. On Linux, install speech-dispatcher and a voice such as espeak-ng.");
   check("first speak() in a fresh page: one call, ends, local voice (T2)", spoke.voices === 0 ? spoke.code === "no_voice" && spoke.said.length === 0 : spoke.local === true && spoke.said.length === 1 && spoke.said[0].text === "Your calendar is open.", spoke);
   const cancelled = await run("speak", "This is a long answer that the user stops before it ends, because they already know the rest of it.", "cancel");
-  check("cancel stops the speech: aborted, nothing speaking (T5)", spoke.voices === 0 || (cancelled.code === "aborted" && cancelled.speaking === false), { code: cancelled.code, speaking: cancelled.speaking, ms: cancelled.ms });
+  check("cancel stops the speech: aborted, its iframe removed (T5)", spoke.voices === 0 || (cancelled.code === "aborted" && cancelled.frames === 0 && cancelled.said.length === 2), { code: cancelled.code, frames: cancelled.frames, ms: cancelled.ms });
   const after = await run("speak", "Done.");
   check("speak() after a cancel still speaks (T9)", spoke.voices === 0 || after.local === true, { voice: after.voice, code: after.code, ms: after.ms });
 

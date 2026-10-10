@@ -38,12 +38,21 @@ async function heard(provider, audio) {
   }
 }
 
-// Record every speechSynthesis.speak call, so the test can assert what was said.
+// Record every speechSynthesis.speak call, so the test can assert what was
+// said. speak() uses a new hidden iframe for each text, so watch each one.
 const said = [];
-const realSpeak = speechSynthesis.speak.bind(speechSynthesis);
-speechSynthesis.speak = (utterance) => {
-  said.push({ text: utterance.text, voice: utterance.voice?.name, lang: utterance.lang });
-  realSpeak(utterance);
+const append = document.body.append.bind(document.body);
+document.body.append = (...nodes) => {
+  append(...nodes);
+  for (const node of nodes) {
+    const synth = node instanceof HTMLIFrameElement ? node.contentWindow?.speechSynthesis : undefined;
+    if (!synth) continue;
+    const real = synth.speak.bind(synth);
+    synth.speak = (utterance) => {
+      said.push({ text: utterance.text, voice: utterance.voice?.name, lang: utterance.lang });
+      real(utterance);
+    };
+  }
 };
 
 window.fv = {
@@ -53,9 +62,7 @@ window.fv = {
     if (how === "cancel") setTimeout(() => controller.abort(), 300);
     const started = performance.now();
     const result = await speak(text, { signal: controller.signal }).catch((error) => ({ code: error.code, message: error.message }));
-    // Firefox updates speechSynthesis.speaking a moment after cancel().
-    if (how === "cancel") await wait(300);
-    return { ...result, ms: Math.round(performance.now() - started), said: said.slice(), speaking: speechSynthesis.speaking, voices: speechSynthesis.getVoices().length };
+    return { ...result, ms: Math.round(performance.now() - started), said: said.slice(), frames: document.querySelectorAll("iframe").length, voices: speechSynthesis.getVoices().length };
   },
   /** Load models from the test's local hub. */
   useHub(url) {
