@@ -148,6 +148,9 @@ the browser, so a CLI would add little.
 
 ### Demo extension
 
+Install from AMO: [addons.mozilla.org/firefox/addon/foxvoice](https://addons.mozilla.org/firefox/addon/foxvoice/)
+(pending AMO review; the link works after approval).
+
 `extension/` is a small Firefox extension. The toolbar button opens a sidebar
 with a hold-to-talk button. Hold it, or hold Space on it, while you speak. The
 sidebar shows the transcript with its confidence, asks a model server on this
