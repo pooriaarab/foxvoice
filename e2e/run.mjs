@@ -35,7 +35,7 @@ try {
   const run = async (name, ...args) => {
     const started = Date.now();
     const value = await within(page.evaluate((n, a) => window.fv[n](...a), name, args), 300, `window.fv.${name}(${args.join(", ")})`);
-    record.timings[name] = Date.now() - started;
+    record.timings[[name, ...args].join(":")] = Date.now() - started;
     return value;
   };
 
@@ -57,18 +57,21 @@ try {
   check("bytes that are not audio give bad_audio (M12)", bad === "bad_audio", bad);
 
   await page.evaluate((url) => window.fv.useHub(url), hub.url);
-  hub.state.cut = true;
-  const cut = await run("whisper", "cut");
-  check("a download cut in half gives download_failed, the next call downloads again (W1)", cut.first.code === "download_failed" && cut.again.text, { first: cut.first.code, again: cut.again.text });
-  const before = hub.state.requests.filter((path) => path.endsWith(".onnx")).length;
+  const before = hub.state.requests.filter((line) => line.startsWith("GET ") && line.endsWith(".onnx")).length;
   const twice = await run("whisper", "twice");
-  const onnx = hub.state.requests.filter((path) => path.endsWith(".onnx")).length - before;
-  check("two calls during the load: one load, both transcripts (W3)", onnx <= 2 && twice.one.text && twice.one.text === twice.two.text, { onnxRequests: onnx, one: twice.one.text, two: twice.two.text });
+  const onnx = hub.state.requests.filter((line) => line.startsWith("GET ") && line.endsWith(".onnx")).length - before;
+  check("two calls during the load: each model file fetched once, both transcripts (W3)", onnx === 2 && twice.one.text && twice.one.text === twice.two.text, { onnxRequests: onnx, one: twice.one.text, two: twice.two.text });
   const wer = wordErrorRate(JFK, twice.warm.text ?? "");
-  record.accuracy = { model: twice.warm.model, reference: JFK, heard: twice.warm.text, wordErrorRate: wer, confidence: twice.warm.confidence, where: twice.warm.status?.where };
+  record.accuracy = { model: twice.warm.status?.model, reference: JFK, heard: twice.warm.text, wordErrorRate: wer, confidence: twice.warm.confidence, where: twice.warm.status?.where };
   record.timings.whisperWarmMs = twice.warm.ms;
   check("jfk.wav word error rate at most 10 % on one WASM thread (W4, W8)", wer <= 0.1 && twice.warm.status?.where === "wasm", record.accuracy);
   check("speech gives confidence over 0.8 (W7)", twice.warm.confidence > 0.8, twice.warm.confidence);
+  await page.evaluate(() => caches.delete("transformers-cache"));
+  hub.state.cut = true;
+  const cut = await run("whisper", "cut");
+  hub.state.cut = false;
+  const again = await run("whisper", "cut-again");
+  check("downloads cut in half give download_failed, the next call downloads again (W1)", cut.code === "download_failed" && again.text, { first: cut.code, again: again.text });
   const noise = await run("whisper", "noise");
   check("noise gives confidence under 0.5 (W7)", noise.confidence < 0.5, { text: noise.text, confidence: noise.confidence });
   const long = await run("whisper", "long");

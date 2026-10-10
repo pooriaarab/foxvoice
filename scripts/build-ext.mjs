@@ -4,7 +4,8 @@
 // --e2e builds dist-e2e/: the same plus the harness page, the WAV
 // microphone and the test audio from e2e/extension/ (never in dist-ext/).
 // Scripts are ES modules: pages load them with <script type="module">.
-import { cpSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { cpSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { build } from "esbuild";
 
 const pkg = JSON.parse(readFileSync("package.json", "utf8"));
@@ -31,4 +32,8 @@ for (const dir of dirs) {
   // amo-metadata.json is the AMO listing, not a part of the add-on.
   for (const file of files.filter((f) => !f.endsWith(".js") && f !== "amo-metadata.json")) cpSync(`${dir}/${file}`, `${out}/${file}`, { recursive: true });
 }
+// ONNX Runtime's WASM files ship in the extension: MV3 allows no remote code.
+const ort = join(dirname(dirname(realpathSync("node_modules/@huggingface/transformers"))), "onnxruntime-web", "dist");
+mkdirSync(`${out}/ort`);
+for (const file of ["ort-wasm-simd-threaded.asyncify.mjs", "ort-wasm-simd-threaded.asyncify.wasm"]) cpSync(join(ort, file), `${out}/ort/${file}`);
 console.log(`Built ${out}/ (version ${pkg.version}).`);

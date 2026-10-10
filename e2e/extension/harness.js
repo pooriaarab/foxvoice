@@ -61,8 +61,8 @@ window.fv = {
       return heard(provider, long);
     }
     if (kind === "webgpu") return { ...(await heard(provider, await jfk())), hasGpu: Boolean(await navigator.gpu?.requestAdapter()) };
-    const first = await heard(provider, await jfk());
-    return kind === "cut" ? { first, again: await heard(provider, await jfk()) } : first;
+    if (kind === "cut") window.cutProvider = provider;
+    return heard(kind === "cut-again" ? window.cutProvider : provider, await jfk());
   },
   /** openMic on the WAV microphone, stopped the way the check asks. */
   async mic(how) {
