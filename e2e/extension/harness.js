@@ -71,11 +71,13 @@ window.fv = {
       speech = voice.speak("This is a long reply that keeps going while the user starts to speak again.").catch((error) => error.code);
       await wait(800);
     }
+    const calls = wavMic.calls;
     const listening = voice.listen();
+    while (wavMic.calls === calls) await wait(20);
     await wavMic.ended;
     voice.stop();
-    const heard = await listening;
-    return { ...heard, states, speech: await speech, frames: document.querySelectorAll("iframe").length, track: trackState() };
+    const result = await listening;
+    return { ...result, states, speech: await speech, frames: document.querySelectorAll("iframe").length, track: trackState() };
   },
   /** speak() with the real engine; "cancel" aborts it after 300 ms. */
   async speak(text, how) {
