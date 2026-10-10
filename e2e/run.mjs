@@ -62,7 +62,7 @@ async function startFakeModel() {
  * button (pointer or Space) while jfk.wav plays, let go, and wait for the reply.
  */
 async function talk(panel, server, press) {
-  return panel.evaluate(async (url, how) => {
+  return within(panel.evaluate(async (url, how) => {
     // oxlint-disable-next-line unicorn/consistent-function-scoping -- this function runs in the page
     const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
     const field = document.getElementById("server");
@@ -72,17 +72,20 @@ async function talk(panel, server, press) {
     const reply = document.getElementById("reply");
     const calls = window.e2e.wavMic.calls;
     const said = window.e2e.said.length;
+    document.getElementById("reply-meta").textContent = "";
     if (how === "space") button.dispatchEvent(new KeyboardEvent("keydown", { code: "Space", bubbles: true }));
     else button.dispatchEvent(new PointerEvent("pointerdown", { pointerId: 1, bubbles: true }));
     while (window.e2e.wavMic.calls === calls) await wait(20);
     await window.e2e.wavMic.ended;
     const release = { space: () => new KeyboardEvent("keyup", { code: "Space", bubbles: true }), up: () => new PointerEvent("pointerup", { pointerId: 1, bubbles: true }), leave: () => new PointerEvent("pointerleave", { pointerId: 1, bubbles: true }) }[how];
     button.dispatchEvent(release());
-    // Each run ends with the reply spoken, then the state goes back to Ready.
-    while (window.e2e.said.length === said) await wait(100);
-    while (document.getElementById("state").textContent !== "Ready.") await wait(100);
-    return { transcript: document.getElementById("transcript").textContent, transcriptMeta: document.getElementById("transcript-meta").textContent, reply: reply.textContent, replyMeta: document.getElementById("reply-meta").textContent, said: window.e2e.said.slice(said), track: window.e2e.wavMic.tracks.at(-1)?.readyState };
-  }, server, press);
+    // A turn ends when the reply is shown and the panel is no longer busy
+    // (Ready., or an error such as no_voice on a system without voices).
+    while (!document.getElementById("reply-meta").textContent) await wait(100);
+    const busy = /^(Listening|Transcribing|Asking|Speaking|Downloading)/;
+    while (busy.test(document.getElementById("state").textContent)) await wait(100);
+    return { state: document.getElementById("state").textContent, transcript: document.getElementById("transcript").textContent, transcriptMeta: document.getElementById("transcript-meta").textContent, reply: reply.textContent, replyMeta: document.getElementById("reply-meta").textContent, said: window.e2e.said.slice(said), track: window.e2e.wavMic.tracks.at(-1)?.readyState };
+  }, server, press), 300, `demo turn (${press})`);
 }
 
 let fox;
@@ -152,20 +155,20 @@ try {
   const none = await talk(panel, "http://127.0.0.1:9/v1", "up");
   record.demo = { none };
   check("demo: hold and let go gives the transcript, microphone off", wordErrorRate(JFK, none.transcript) <= 0.1 && none.track === "ended", none);
-  check("demo: no model server: the reply says so, repeats what it heard, and is spoken (D3)", none.reply.includes("No local model server") && none.said.some((s) => s.text === none.reply), { reply: none.reply, said: none.said });
+  check("demo: no model server: the reply says so, repeats what it heard, and is spoken (D3)", none.reply.includes("No local model server") && (spoke.voices === 0 ? /voice/.test(none.state) : none.said.some((s) => s.text === none.reply)), { reply: none.reply, said: none.said });
   const model = await startFakeModel();
   const answered = await talk(panel, model.url, "space");
   record.demo.answered = answered;
-  check("demo: Space is push to talk; foxmind gets the reply from the local server and it is spoken (D4, D5)", answered.reply === model.answer && /model server \(local\)/.test(answered.replyMeta) && answered.said.some((s) => s.text === model.answer), { reply: answered.reply, who: answered.replyMeta, said: answered.said });
+  check("demo: Space is push to talk; foxmind gets the reply from the local server and it is spoken (D4, D5)", answered.reply === model.answer && /model server \(local\)/.test(answered.replyMeta) && (spoke.voices === 0 || answered.said.some((s) => s.text === model.answer)), { reply: answered.reply, who: answered.replyMeta, said: answered.said });
   const left = await talk(panel, model.url, "leave");
   check("demo: the pointer leaving the button lets go (D2)", wordErrorRate(JFK, left.transcript) <= 0.1 && left.track === "ended", { transcript: left.transcript, track: left.track });
   await model.close();
   const setup = await fox.openExtensionPage("setup.html");
-  const allowed = await setup.evaluate(async () => {
+  const allowed = await within(setup.evaluate(async () => {
     document.getElementById("allow").click();
     while (!document.getElementById("result").dataset.state) await new Promise((resolve) => setTimeout(resolve, 50));
     return document.getElementById("result").dataset.state;
-  });
+  }), 30, "setup page");
   check("setup page asks for the microphone in a tab and reports it (D1)", allowed === "allowed", allowed);
 
   const noise = await run("whisper", "noise");
