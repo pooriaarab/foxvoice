@@ -90,6 +90,7 @@ Words used here:
 | T6 | The text is empty. | Throw code `bad_input`. | unit |
 | T7 | The engine never sends `end`. | Throw code `timeout` after a time that grows with the text length. | unit |
 | T8 | `listen()` while it speaks: the microphone would hear the reply. | Stop the speech first, then start the microphone. | E2E |
+| T9 | After `cancel()` during speech, Firefox keeps the page's speech queue stuck: `speaking` stays true and later utterances never start (seen in Firefox 157 on macOS; see [bug 1522074](https://bugzilla.mozilla.org/show_bug.cgi?id=1522074)). | Speak each text in its own hidden iframe, which has its own speech queue, and remove the iframe at the end. | E2E: `speak()` after a cancel ends |
 
 ## Demo extension (D)
 
