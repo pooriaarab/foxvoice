@@ -39,12 +39,9 @@ describe("microphone", () => {
     ["AbortError", "mic_busy"],
   ])("M2-M4: getUserMedia %s gives %s", async (name, wanted) => {
     const { media } = fakeMedia();
-    expect(await code(openMic({ media: { ...media, getUserMedia: refusing(name) } }))).toBe(wanted);
-  });
-
-  it("M2: the denied message says how to allow the microphone", async () => {
-    const { media } = fakeMedia();
-    await expect(openMic({ media: { ...media, getUserMedia: refusing("NotAllowedError") } })).rejects.toThrow(/allow/i);
+    const opening = openMic({ media: { ...media, getUserMedia: refusing(name) } });
+    expect(await code(opening)).toBe(wanted);
+    if (wanted === "mic_denied") await expect(opening).rejects.toThrow(/allow it/);
   });
 
   it("records until stop and gives 16 kHz audio", async () => {
