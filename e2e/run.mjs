@@ -5,6 +5,7 @@
 // Usage: pnpm e2e [--headed]. Env: FIREFOX (the Firefox binary).
 import { launch, writeArtifact } from "create-foxkit/e2e";
 import { startHub, wordErrorRate } from "./hub.mjs";
+import { runNode } from "./node.mjs";
 
 const record = { startedAt: new Date().toISOString(), checks: [], skipped: [], timings: {} };
 const check = (name, ok, actual) => record.checks.push({ name, ok: Boolean(ok), actual });
@@ -29,6 +30,7 @@ const JFK = "And so my fellow Americans, ask not what your country can do for yo
 const hub = await startHub();
 let fox;
 try {
+  await runNode(record, check, JFK);
   fox = await launch({ extension: "dist-e2e", headless: !process.argv.includes("--headed"), prefs: PREFS });
   record.firefox = await fox.browser.version();
   const page = await fox.openExtensionPage("harness.html");
