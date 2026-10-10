@@ -9,6 +9,11 @@ import { runNode } from "./node.mjs";
 
 const record = { startedAt: new Date().toISOString(), checks: [], skipped: [], timings: {} };
 const check = (name, ok, actual) => record.checks.push({ name, ok: Boolean(ok), actual });
+/** A check that cannot run on this machine: say why in the log and the artifact, and go on. */
+const skip = (name, reason) => {
+  record.skipped.push({ name, reason });
+  console.log(`SKIP ${name}: ${reason}`);
+};
 /** Fail with the name of the call when a page call does not settle, not with Puppeteer's protocol timeout (H2). */
 const within = (promise, seconds, what) => {
   let timer;
@@ -41,6 +46,16 @@ try {
     return value;
   };
 
+  // First, in the fresh page: Firefox fills the voice list late (T2).
+  const spoke = await run("speak", "Your calendar is open.");
+  record.tts = spoke;
+  if (spoke.voices === 0) skip("speech checks that need a voice (T2 speech, T5, T8, T9, demo speech)", "Firefox has no speech voices here, so speak() fails with no_voice. On Linux, install speech-dispatcher and a voice such as espeak-ng.");
+  check("first speak() in a fresh page: one call, ends, local voice (T2)", spoke.voices === 0 ? spoke.code === "no_voice" && spoke.said.length === 0 : spoke.local === true && spoke.said.length === 1 && spoke.said[0].text === "Your calendar is open.", spoke);
+  const cancelled = await run("speak", "This is a long answer that the user stops before it ends, because they already know the rest of it.", "cancel");
+  check("cancel stops the speech: aborted, its iframe removed (T5)", spoke.voices === 0 || (cancelled.code === "aborted" && cancelled.frames === 0 && cancelled.said.length === 2), { code: cancelled.code, frames: cancelled.frames, ms: cancelled.ms });
+  const after = await run("speak", "Done.");
+  check("speak() after a cancel still speaks (T9)", spoke.voices === 0 || after.local === true, { voice: after.voice, code: after.code, ms: after.ms });
+
   const env = await run("env");
   check("extension page has no SharedArrayBuffer (W4)", env.crossOriginIsolated === false && env.sharedArrayBuffer === "undefined", env);
   const device = await run("fakeDevice");
@@ -53,8 +68,8 @@ try {
   check("level events while the microphone is on", stopped.levels > 5 && stopped.level > 0.05, { levels: stopped.levels, level: stopped.level });
   const limit = await run("mic", "limit");
   check("time limit: stops at 3 s, microphone off (M5, M7)", limit.stoppedBy === "limit" && Math.abs(limit.seconds - 3) < 0.5 && limit.track === "ended", limit);
-  const cancelled = await run("mic", "cancel");
-  check("cancel: aborted, microphone off (M5, M10)", cancelled.outcome === "aborted" && cancelled.track === "ended", cancelled);
+  const micCancelled = await run("mic", "cancel");
+  check("cancel: aborted, microphone off (M5, M10)", micCancelled.outcome === "aborted" && micCancelled.track === "ended", micCancelled);
   const bad = await run("badAudio");
   check("bytes that are not audio give bad_audio (M12)", bad === "bad_audio", bad);
 

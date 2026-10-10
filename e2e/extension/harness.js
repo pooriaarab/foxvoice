@@ -1,7 +1,7 @@
 // The E2E harness page. e2e/run.mjs calls window.fv.* here, in the
 // extension, so foxvoice runs with the real Firefox media and speech APIs.
 import { whisper } from "../../src/browser/index.ts";
-import { decodeAudio, openMic } from "../../src/index.ts";
+import { decodeAudio, openMic, speak } from "../../src/index.ts";
 import { useWavMic, wavMic } from "./wav-mic.js";
 
 const realGetUserMedia = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
@@ -38,7 +38,32 @@ async function heard(provider, audio) {
   }
 }
 
+// Record every speechSynthesis.speak call, so the test can assert what was
+// said. speak() uses a new hidden iframe for each text, so watch each one.
+const said = [];
+const append = document.body.append.bind(document.body);
+document.body.append = (...nodes) => {
+  append(...nodes);
+  for (const node of nodes) {
+    const synth = node instanceof HTMLIFrameElement ? node.contentWindow?.speechSynthesis : undefined;
+    if (!synth) continue;
+    const real = synth.speak.bind(synth);
+    synth.speak = (utterance) => {
+      said.push({ text: utterance.text, voice: utterance.voice?.name, lang: utterance.lang });
+      real(utterance);
+    };
+  }
+};
+
 window.fv = {
+  /** speak() with the real engine; "cancel" aborts it after 300 ms. */
+  async speak(text, how) {
+    const controller = new AbortController();
+    if (how === "cancel") setTimeout(() => controller.abort(), 300);
+    const started = performance.now();
+    const result = await speak(text, { signal: controller.signal }).catch((error) => ({ code: error.code, message: error.message }));
+    return { ...result, ms: Math.round(performance.now() - started), said: said.slice(), frames: document.querySelectorAll("iframe").length, voices: speechSynthesis.getVoices().length };
+  },
   /** Load models from the test's local hub. */
   useHub(url) {
     hub = url;
