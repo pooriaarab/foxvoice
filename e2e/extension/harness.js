@@ -1,5 +1,6 @@
 // The E2E harness page. e2e/run.mjs calls window.fv.* here, in the
 // extension, so foxvoice runs with the real Firefox media and speech APIs.
+import { whisper } from "../../src/browser/index.ts";
 import { decodeAudio, openMic } from "../../src/index.ts";
 import { useWavMic, wavMic } from "./wav-mic.js";
 
@@ -24,7 +25,45 @@ const trackState = () => wavMic.tracks.at(-1)?.readyState;
 /** Run a promise and return its FoxvoiceError code, or "ok". */
 const outcome = (promise) => promise.then(() => "ok", (error) => error.code ?? String(error));
 
+let hub = "https://huggingface.co/";
+const jfk = async () => decodeAudio(await (await fetch("jfk.wav")).blob());
+/** Transcribe and time it; a failure gives its code. */
+async function heard(provider, audio) {
+  const started = performance.now();
+  try {
+    const result = await provider.transcribe(audio, {});
+    return { ...result, ms: Math.round(performance.now() - started), status: provider.status() };
+  } catch (error) {
+    return { code: error.code ?? String(error), message: error.message, status: provider.status() };
+  }
+}
+
 window.fv = {
+  /** Load models from the test's local hub. */
+  useHub(url) {
+    hub = url;
+  },
+  /** Whisper in this page, in the case the check asks for. */
+  async whisper(kind) {
+    const provider = whisper({ remoteHost: hub, ...(kind === "webgpu" ? { device: "webgpu" } : {}), ...(kind === "missing" ? { model: "onnx-community/no-such-whisper.en" } : {}) });
+    if (kind === "twice") {
+      const [one, two] = await Promise.all([heard(provider, await jfk()), heard(provider, await jfk())]);
+      return { one, two, warm: await heard(provider, await jfk()) };
+    }
+    if (kind === "noise") {
+      const noise = Float32Array.from({ length: 3 * 16000 }, () => (Math.random() * 2 - 1) * 0.05);
+      return heard(provider, noise);
+    }
+    if (kind === "long") {
+      const audio = await jfk();
+      const long = new Float32Array(audio.length * 3);
+      for (let i = 0; i < 3; i++) long.set(audio, i * audio.length);
+      return heard(provider, long);
+    }
+    if (kind === "webgpu") return { ...(await heard(provider, await jfk())), hasGpu: Boolean(await navigator.gpu?.requestAdapter()) };
+    if (kind === "cut") window.cutProvider = provider;
+    return heard(kind === "cut-again" ? window.cutProvider : provider, await jfk());
+  },
   /** openMic on the WAV microphone, stopped the way the check asks. */
   async mic(how) {
     useWavMic("jfk.wav");
