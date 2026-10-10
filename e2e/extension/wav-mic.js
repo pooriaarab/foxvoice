@@ -16,7 +16,7 @@ export function useWavMic(url) {
     source.buffer = buffer;
     const sink = context.createMediaStreamDestination();
     source.connect(sink);
-    wavMic.ended = new Promise((resolve) => (source.onended = resolve));
+    wavMic.ended = new Promise((resolve) => source.addEventListener("ended", resolve, { once: true }));
     source.start();
     const [track] = sink.stream.getAudioTracks();
     track.addEventListener("ended", () => context.close());

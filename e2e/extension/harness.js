@@ -8,8 +8,8 @@ const realGetUserMedia = navigator.mediaDevices.getUserMedia.bind(navigator.medi
 async function record(stream, until) {
   const recorder = new MediaRecorder(stream);
   const chunks = [];
-  recorder.ondataavailable = (event) => chunks.push(event.data);
-  const stopped = new Promise((resolve) => (recorder.onstop = resolve));
+  recorder.addEventListener("dataavailable", (event) => chunks.push(event.data));
+  const stopped = new Promise((resolve) => recorder.addEventListener("stop", resolve, { once: true }));
   recorder.start();
   await until;
   recorder.stop();
