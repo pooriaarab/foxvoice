@@ -1,2 +1,3 @@
-// The public API of foxvoice. Replace this export with the real one.
-export const name = "foxvoice";
+export { FoxvoiceError, type ErrorCode, type ErrorDetails } from "./errors.js";
+export { SAMPLE_RATE, decodeAudio, encodeWav, loudness } from "./audio.js";
+export { openMic, type MediaHooks, type Mic, type MicOptions, type Recording, type StopReason } from "./mic.js";
