@@ -1,5 +1,4 @@
-// Failure modes M1-M14 that a unit test reaches (docs/failure-modes.md).
-// The E2E test covers the rest with the real Firefox media stack.
+// Failure modes M1-M14 that a unit test reaches; the E2E test covers the rest.
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { FoxvoiceError, openMic } from "../src/index.js";
 import { FakeRecorder, fakeMedia, refusing, tone } from "./fake-media.js";
