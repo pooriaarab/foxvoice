@@ -39,6 +39,16 @@ try {
   check("fake device: getUserMedia gives a track that records", device.bytes > 0 && device.ended === "ended", device);
   const wav = await run("wavMic");
   check("WAV microphone: 11 s of 48 kHz audio decodes to 11 s at 16 kHz (M13)", wav.seconds > 10.9 && wav.seconds < 12.5 && wav.rate === 16000, wav);
+
+  const stopped = await run("mic", "stop");
+  check("push to talk: let go after the file gives 11 s of audio, microphone off (M5, M13)", stopped.stoppedBy === "user" && stopped.seconds > 10.5 && stopped.track === "ended", stopped);
+  check("level events while the microphone is on", stopped.levels > 5 && stopped.level > 0.05, { levels: stopped.levels, level: stopped.level });
+  const limit = await run("mic", "limit");
+  check("time limit: stops at 3 s, microphone off (M5, M7)", limit.stoppedBy === "limit" && Math.abs(limit.seconds - 3) < 0.5 && limit.track === "ended", limit);
+  const cancelled = await run("mic", "cancel");
+  check("cancel: aborted, microphone off (M5, M10)", cancelled.outcome === "aborted" && cancelled.track === "ended", cancelled);
+  const bad = await run("badAudio");
+  check("bytes that are not audio give bad_audio (M12)", bad === "bad_audio", bad);
 } catch (error) {
   record.error = error instanceof Error ? error.message : String(error);
 } finally {
