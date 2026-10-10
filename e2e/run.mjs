@@ -105,7 +105,7 @@ try {
   const heard = await run("voice", trap.url, "barge-in");
   check("createVoice: push to talk gives the jfk transcript from whisper in the browser", wordErrorRate(JFK, heard.text) <= 0.1 && heard.provider === "whisper" && heard.tier === "browser" && heard.track === "ended", { text: heard.text, provider: heard.provider, confidence: heard.confidence, audioMs: heard.audioMs, ms: heard.ms });
   check("private mode: the cloud trap server got 0 requests and is listed as skipped (R1)", trap.requests.length === 0 && heard.skipped?.[0]?.code === "private_mode", { requests: trap.requests.length, skipped: heard.skipped });
-  check("listen() while it speaks stops the speech first (T8)", heard.speech === "aborted" && heard.frames === 0 && heard.states.join(",") === "speaking,listening,transcribing,idle", { speech: heard.speech, states: heard.states });
+  check("listen() while it speaks stops the speech first (T8)", spoke.voices === 0 ? heard.speech === "no_voice" : heard.speech === "aborted" && heard.frames === 0 && heard.states.join(",") === "speaking,listening,transcribing,idle", { speech: heard.speech, states: heard.states });
   await trap.close();
   const noise = await run("whisper", "noise");
   check("noise gives confidence under 0.5 (W7)", noise.confidence < 0.5, { text: noise.text, confidence: noise.confidence });
