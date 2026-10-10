@@ -122,6 +122,6 @@ export function whisperServer(options: { port?: number; model?: string } = {}): 
     baseURL: `http://127.0.0.1:${port}/v1`,
     model: options.model ?? "whisper-1",
     name: "whisper-server",
-    startHint: `Start it with "whisper-server -m ggml-base.en.bin --port ${port} --inference-path /v1/audio/transcriptions".`,
+    startHint: `Start it with "whisper-server -m ggml-tiny.en.bin --port ${port} --inference-path /v1/audio/transcriptions".`,
   });
 }
