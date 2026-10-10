@@ -4,5 +4,5 @@
     "correctness": "error",
     "suspicious": "warn"
   },
-  "ignorePatterns": ["dist", "dist-ext", "artifacts"]
+  "ignorePatterns": ["dist", "dist-ext", "dist-e2e", "artifacts"]
 }
