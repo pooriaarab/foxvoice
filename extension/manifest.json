@@ -30,8 +30,7 @@
     "type": "module"
   },
   "action": {
-    "default_title": "foxvoice",
-    "default_popup": "popup.html",
+    "default_title": "foxvoice: push to talk",
     "default_icon": {
       "48": "icons/icon-48.png",
       "96": "icons/icon-96.png"
@@ -39,5 +38,16 @@
   },
   "content_security_policy": {
     "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
+  },
+  "host_permissions": [
+    "http://127.0.0.1/*"
+  ],
+  "sidebar_action": {
+    "default_title": "foxvoice",
+    "default_panel": "panel.html",
+    "default_icon": {
+      "48": "icons/icon-48.png",
+      "96": "icons/icon-96.png"
+    }
   }
 }
