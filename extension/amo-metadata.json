@@ -1,0 +1,23 @@
+{
+  "default_locale": "en-US",
+  "slug": "foxvoice",
+  "name": { "en-US": "foxvoice — push to talk for your browser" },
+  "summary": {
+    "en-US": "Hold a button, speak, and hear the answer. Speech to text runs in your browser with Whisper, and the reply is spoken with a voice on your computer. Audio and text stay on your computer."
+  },
+  "description": {
+    "en-US": "foxvoice adds push to talk to the sidebar. Hold the button, or hold Space on it, while you speak. Let go, and the sidebar shows what you said, gets a reply from a model on your computer, and reads the reply aloud.\n\n**Who it is for:** people who want to talk to an AI model or agent on their own computer, with no cloud speech service.\n\n**What it does**\n\n- Turns the microphone on only while you hold the button. It turns it off when you let go.\n- Turns speech into text with Whisper tiny.en in the browser (English).\n- Shows how sure the model is of what it heard, and asks you again when it is not sure.\n- Asks a model server on your computer for a reply, for example llama-server or Ollama.\n- Reads the reply aloud with a voice of your operating system.\n\n**What leaves your computer, and when**\n\n- Nothing, in normal use. Audio and text go only to the speech model in the browser, and to servers on this computer (127.0.0.1) when you choose them in Settings.\n- The speech model downloads from Hugging Face once (43 MB). These requests hold no audio and no text.\n- foxvoice has no server and sends nothing to its authors.\n\n**Permissions**\n\n- Access to 127.0.0.1: talk to whisper-server and to the model server on your computer.\n- Storage and unlimited storage: settings and the speech model files stay in your browser.\n- The microphone: Firefox asks you the first time. The setup page asks in a tab if the sidebar cannot.\n\nfoxvoice is an early version. The source code is MIT licensed."
+  },
+  "categories": { "firefox": ["language-support", "privacy-security"] },
+  "homepage": { "en-US": "https://github.com/pooriaarab/foxvoice" },
+  "support_url": { "en-US": "https://github.com/pooriaarab/foxvoice/issues" },
+  "version": {
+    "license": "MIT",
+    "approval_notes": "The uploaded source.zip is the git tree of this release. To build: install Node 24 and pnpm 11 (corepack enable), run `pnpm install --frozen-lockfile`, then `pnpm build:ext`. The output is dist-ext/. esbuild bundles extension/*.js with src/, foxmind and transformers.js; transformers.js is its own chunk in vendor/. ort/ holds ONNX Runtime's WASM files from the npm package onnxruntime-web, unmodified. To try it: click the toolbar button to open the sidebar, hold the button and speak. The first use downloads the Whisper model from Hugging Face. Replies need a model server on 127.0.0.1 (llama-server on port 8080); without one, the reply says so. No account is needed."
+  },
+  "local_hosts": {
+    "http://127.0.0.1/*": {
+      "host_permission": "The add-on sends the user's speech to whisper-server and the transcript to a model server that the user runs on this computer, so the audio and text stay local."
+    }
+  }
+}
