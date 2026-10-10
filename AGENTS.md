@@ -87,3 +87,19 @@ pnpm e2e        # builds dist-e2e/, then Firefox E2E; set FIREFOX if Firefox is 
 Prefer E2E tests. Do not write unit tests after the code. To test a part in
 isolation, first list its failure modes in `docs/failure-modes.md`, then write
 the tests, then the code. Commit in that order.
+
+## Release
+
+`main` is staging and `release` is production. A push to `release` runs
+`.github/workflows/release.yml`. It refuses a version that has a tag, runs
+`pnpm ci:local`, publishes to npm with the `NPM_TOKEN` secret, then tags
+`v<version>` and creates a GitHub release.
+
+After the npm publish, it submits `dist-ext/` to AMO as a listed add-on,
+with the listing in `extension/amo-metadata.json`. AMO reviews the version
+before it signs it, so the GitHub release links to the listing and has no
+`.xpi`. It needs the secrets `AMO_JWT_ISSUER` and `AMO_JWT_SECRET`. Keep the
+`version` in `extension/manifest.json` equal to the one in `package.json`.
+`pnpm check:amo` checks the listing and the release build in `dist-ext/`;
+it runs in `pnpm ci:local`. Keep test-only parts in `e2e/extension/`. If a
+release re-run finds the version already listed on AMO, it skips the upload.
