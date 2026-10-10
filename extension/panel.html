@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width" />
+    <title>foxvoice</title>
+    <link rel="stylesheet" href="panel.css" />
+  </head>
+  <body>
+    <header>
+      <h1>foxvoice</h1>
+      <p class="private" id="privacy">Private mode: audio and text stay on this computer.</p>
+    </header>
+
+    <button id="talk" type="button" aria-describedby="hint">
+      <span class="dot" aria-hidden="true"></span>
+      <span id="talk-label">Hold to talk</span>
+    </button>
+    <p id="hint" class="hint">Hold the button, or hold Space on it, while you speak. Let go to send.</p>
+    <meter id="level" min="0" max="0.3" value="0" aria-label="Microphone level"></meter>
+    <p id="state" role="status">Ready.</p>
+    <p id="mic-help" class="error" hidden>
+      <span id="mic-error"></span>
+      <button id="setup" type="button">Set up the microphone</button>
+    </p>
+
+    <section aria-labelledby="you-title">
+      <h2 id="you-title">You said</h2>
+      <p id="transcript" class="bubble empty">Nothing yet.</p>
+      <p id="transcript-meta" class="meta"></p>
+    </section>
+    <section aria-labelledby="reply-title">
+      <h2 id="reply-title">Reply</h2>
+      <p id="reply" class="bubble empty">Nothing yet.</p>
+      <p id="reply-meta" class="meta"></p>
+    </section>
+
+    <details>
+      <summary>Settings</summary>
+      <label>Speech to text
+        <select id="engine">
+          <option value="whisper">Whisper tiny.en in Firefox (43 MB, English)</option>
+          <option value="whisper-server">whisper-server on this computer</option>
+        </select>
+      </label>
+      <label>Model server for replies (OpenAI API)
+        <input id="server" type="url" value="http://127.0.0.1:8080/v1" />
+      </label>
+      <label>Model name
+        <input id="model" type="text" value="default" />
+      </label>
+      <label class="check"><input id="speak" type="checkbox" checked /> Speak the reply</label>
+    </details>
+    <script type="module" src="panel.js"></script>
+  </body>
+</html>
