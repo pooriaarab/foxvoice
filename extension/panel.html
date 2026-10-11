@@ -8,8 +8,9 @@
   </head>
   <body>
     <header>
+      <img class="mark" src="icons/icon-48.png" alt="" width="22" height="22" />
       <h1>foxvoice</h1>
-      <p class="private" id="privacy">Private mode: audio and text stay on this computer.</p>
+      <p class="private" id="privacy"><span class="dot ok" aria-hidden="true"></span>Private mode: audio and text stay on this computer.</p>
     </header>
 
     <button id="talk" type="button" aria-describedby="hint">
@@ -21,7 +22,7 @@
     <p id="state" role="status">Ready.</p>
     <p id="mic-help" class="error" hidden>
       <span id="mic-error"></span>
-      <button id="setup" type="button">Set up the microphone</button>
+      <button id="setup" class="small" type="button">Set up the microphone</button>
     </p>
 
     <section aria-labelledby="you-title">
