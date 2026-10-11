@@ -1,6 +1,6 @@
 {
   "name": "foxvoice",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Speak a goal to your Firefox agent and hear the result, with speech that stays on your device.",
   "type": "module",
   "license": "MIT",
