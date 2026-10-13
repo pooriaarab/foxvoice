@@ -104,3 +104,11 @@ for (const [key, field] of Object.entries(fields)) {
   });
 }
 makeVoice();
+
+// Settings open from the cog in the header, as in foxmate.
+const settingsToggle = document.getElementById("settings-toggle");
+settingsToggle.addEventListener("click", () => {
+  const settings = document.getElementById("settings");
+  settings.hidden = !settings.hidden;
+  settingsToggle.setAttribute("aria-expanded", String(!settings.hidden));
+});
