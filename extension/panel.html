@@ -10,6 +10,7 @@
     <header>
       <img class="mark" src="icons/icon-48.png" alt="" width="22" height="22" />
       <h1>foxvoice</h1>
+      <button id="settings-toggle" type="button" class="icon-button" aria-label="Settings" aria-controls="settings" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" /><circle cx="12" cy="12" r="3" /></svg></button>
       <p class="private" id="privacy"><span class="dot ok" aria-hidden="true"></span>Private mode: audio and text stay on this computer.</p>
     </header>
 
@@ -36,8 +37,8 @@
       <p id="reply-meta" class="meta"></p>
     </section>
 
-    <details>
-      <summary>Settings</summary>
+    <section id="settings" class="settings" aria-labelledby="settings-title" hidden>
+      <h2 id="settings-title">Settings</h2>
       <label>Speech to text
         <select id="engine">
           <option value="whisper">Whisper tiny.en in Firefox (43 MB, English)</option>
@@ -51,7 +52,7 @@
         <input id="model" type="text" value="default" />
       </label>
       <label class="check"><input id="speak" type="checkbox" checked /> Speak the reply</label>
-    </details>
+    </section>
     <script type="module" src="panel.js"></script>
   </body>
 </html>
