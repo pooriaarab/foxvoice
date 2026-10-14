@@ -1,7 +1,7 @@
 {
   "name": "foxvoice",
   "version": "0.1.2",
-  "description": "Speak a goal to your Firefox agent and hear the result, with speech that stays on your device.",
+  "description": "Firefox speech recognition and text-to-speech with browser Whisper, whisper.cpp, and OpenAI-compatible transcription servers.",
   "type": "module",
   "license": "MIT",
   "author": "Pooria Arab",
@@ -58,5 +58,19 @@
     "@huggingface/transformers": {
       "optional": true
     }
-  }
+  },
+  "keywords": [
+    "firefox",
+    "speech-recognition",
+    "text-to-speech",
+    "push-to-talk",
+    "whisper",
+    "whisper.cpp",
+    "Hugging Face",
+    "Transformers.js",
+    "OpenAI",
+    "WebAssembly",
+    "WebGPU",
+    "foxmind"
+  ]
 }

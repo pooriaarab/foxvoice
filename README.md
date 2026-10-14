@@ -1,29 +1,27 @@
 # foxvoice
 
-Speak a goal to your Firefox agent and hear the result, with speech that stays on your device.
+[![npm version](https://img.shields.io/npm/v/foxvoice)](https://www.npmjs.com/package/foxvoice)
+[![Downloads/month](https://img.shields.io/npm/dm/foxvoice)](https://www.npmjs.com/package/foxvoice)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](https://opensource.org/license/mit)
 
-foxvoice gives a Firefox extension push to talk: `listen()` turns the
-microphone on while the user holds a button, Whisper turns the audio into text
-inside the extension page, and `speak()` reads the answer aloud with a voice
-on the computer. Private mode is the default, so audio and text do not leave
-the computer. A cloud speech service runs only when you opt in with your own
-key.
+[Package](https://www.npmjs.com/package/foxvoice) · [Setup](#send-your-first-transcript) · [API](#runtime-surfaces) · [Comparisons](#compare)
+
+foxvoice is an open-source speech interface for Firefox extension developers. It combines push-to-talk recording, speech recognition, and local text-to-speech. Provider routing allows browser and local speech by default.
 
 ## Install
 
 ```bash
-npm i foxvoice
+npm install foxvoice @huggingface/transformers
 ```
 
-For Whisper in the browser, also install the optional peer dependency:
-`npm i @huggingface/transformers`.
+Node.js 24 or newer is required for development. Speech runs in a browser page with microphone and speech APIs.
+The package has one direct runtime dependency, foxmind, and an optional Transformers.js peer dependency.
 
-## Example
+## Send your first transcript
 
-This runs in an extension page, such as a sidebar or a popup, after a bundler
-such as esbuild. Copy ONNX Runtime's `ort-wasm-simd-threaded.asyncify.mjs` and
-`.wasm` from `onnxruntime-web/dist` to `ort/` in the extension, as
-`scripts/build-ext.mjs` does.
+Bundle this code into a Firefox extension sidebar or popup with a `<button id="talk">Talk</button>` element.
+Copy ONNX Runtime's `ort-wasm-simd-threaded.asyncify.mjs` and `.wasm` files from `onnxruntime-web/dist` into the extension's `ort/` directory.
+Allow model downloads from Hugging Face in your extension policy. No environment variables or API keys are required.
 
 ```js
 import { createVoice } from "foxvoice";
@@ -31,241 +29,163 @@ import { whisper } from "foxvoice/browser";
 
 const voice = createVoice({ stt: [whisper()] });
 const button = document.querySelector("#talk");
-
 button.addEventListener("pointerdown", async () => {
-  const heard = await voice.listen();
-  console.log(heard.text, heard.confidence, `${heard.provider} (${heard.tier})`);
-  await voice.speak(`You said: ${heard.text}`);
+  try {
+    const heard = await voice.listen();
+    console.log(heard.text, heard.provider, heard.tier);
+    await voice.speak(`You said: ${heard.text}`);
+  } catch (error) {
+    console.error(error);
+  }
 });
 button.addEventListener("pointerup", () => voice.stop());
+button.addEventListener("pointercancel", () => voice.cancel());
 ```
 
-When the microphone plays `e2e/extension/jfk.wav`, as in the E2E test, the
-log line reads as follows. The confidence was between 0.88 and 0.90 in our runs.
-
-```text
-And so my fellow Americans ask not what your country can do for you, ask what you can do for your country. 0.8885567526339256 whisper (browser)
-```
-
-## Use cases
-
-| Who | What they build | How foxvoice helps |
-|---|---|---|
-| An agent builder (foxmate, foxloop) | A voice front end: say a goal, hear the result | `listen()` gives the goal as text, and `speak()` reads the agent's answer. In private mode, neither leaves the computer. |
-| A Firefox extension developer | Voice notes or dictation in an extension | `whisper()` runs in the extension page with no server and no account. |
-| An accessibility tool | Read results aloud and take spoken commands | `speak()` picks a voice on the device and waits for Firefox's voice list, which is empty at first. |
-| A team with a speech server | Dictation that uses whisper.cpp on the same computer | `whisperServer()` talks to `whisper-server`. Its tier is `local`, so private mode allows it. |
-| A developer who pays for a cloud service | Better accuracy for other languages | `transcriptionServer()` takes your own key for any service with the OpenAI transcription API. It runs only when `only` includes `"cloud"`. |
-| A researcher | A check of how well small Whisper models hear in a browser | The E2E test measures the word error rate and the confidence on a known WAV file in real Firefox. |
+Hold the button, grant microphone access, speak, then release it.
+The first call downloads model files. Success prints your transcript with `whisper browser` and reads it aloud with an available local voice.
 
 ## How it works
 
-```mermaid
-flowchart TB
-  user["User holds the talk button"] --> listen["voice.listen()"]
-  listen --> mic["openMic: getUserMedia + MediaRecorder"]
-  mic -->|"let go, time limit, or device ends"| decode["decode to 16 kHz mono"]
-  decode -->|"silent or too short"| refuse["no_speech / too_short: no model runs"]
-  decode --> router["choose a provider"]
-  router -->|"tier not in only (private mode)"| skip["skipped: private_mode, never called"]
-  router --> browser["whisper(): Whisper in the extension page, one WASM thread"]
-  router --> local["whisperServer(): whisper.cpp on 127.0.0.1"]
-  router -. "opt in with your key" .-> cloud["transcriptionServer(): cloud API"]
-  browser --> heard["text + confidence + provider + tier"]
-  local --> heard
-  cloud --> heard
-  heard --> agent["your agent or model"]
-  agent --> speak["voice.speak(): a voice on the device"]
+```text
+Microphone -> 16 kHz mono audio -> allowed speech provider -> transcript
+                                                              |
+Your application -> reply text -> local speech synthesis <-----+
 ```
 
-The microphone is on only between `listen()` and `stop()`. Every way out
-(let go, `cancel()`, the time limit, an error) stops every track. foxvoice
-checks the audio before any model runs: silence fails with `no_speech`, and a
-short press fails with `too_short`.
+`only` defaults to `["browser", "local"]`. Disallowed providers are never probed or called.
+Model files still need an initial download; local inference does not mean an offline first installation.
 
-```mermaid
-sequenceDiagram
-  participant User
-  participant Panel as Demo sidebar
-  participant Voice as createVoice
-  participant Whisper as whisper()
-  participant Mind as foxmind (local tier)
-  User->>Panel: hold the button
-  Panel->>Voice: listen()
-  Voice->>Voice: stop any speech, open the microphone
-  User->>Panel: let go
-  Panel->>Voice: stop()
-  Voice->>Whisper: transcribe(16 kHz audio)
-  Whisper-->>Voice: text, confidence
-  Voice-->>Panel: transcript
-  Panel->>Mind: chat(transcript)
-  Mind-->>Panel: reply, "model server (local)"
-  Panel->>Voice: speak(reply)
-```
+## Why it exists
 
-Firefox has no speech recognition that a web page can use, so foxvoice does
-not use `SpeechRecognition`. Firefox's own `browser.trial.ml` engine has no
-speech recognition task either, so foxvoice runs Whisper with transformers.js.
-Extension pages have no `SharedArrayBuffer`, so ONNX Runtime uses one WASM
-thread.
+Firefox extension developers need recording, transcription, and speech playback in one interface.
+annyang provides voice commands through browser speech recognition. Whisper Turbo provides browser Whisper inference.
+foxvoice adds tier-based provider routing and microphone lifecycle controls around speech tasks.
 
-## API
+## Compare
 
-### `foxvoice`
+Scope checked on 2026-10-14 against [annyang](https://www.talater.com/annyang/) and [Whisper Turbo](https://github.com/FL33TW00D/whisper-turbo).
 
-| Export | What it does |
-|---|---|
-| `createVoice({ stt, only?, prefer?, fallbackOnError?, mic?, tts? })` | Makes a voice. `only` is the list of tiers that may run; the default `["browser", "local"]` is private mode. A provider in another tier is never probed or called, and goes into `skipped` with code `private_mode`. `prefer` takes provider names or tiers and only changes the order. |
-| `voice.listen({ signal?, maxMs?, language? })` | Turns the microphone on and resolves with the transcript: `{ text, confidence?, provider, tier, model, ms, audioMs, stoppedBy, skipped }`. It stops any speech first. A second call while the microphone is on fails with `busy`. |
-| `voice.stop()` / `voice.cancel()` | Let go (transcribe what came) / drop the audio or stop the speech (`aborted`). |
-| `voice.transcribe(audio)` | Transcribe 16 kHz samples (`Float32Array`) or a `Blob` the browser can decode, without the microphone. |
-| `voice.speak(text, options?)` | Speak with a voice on the device. In private mode, a voice whose `localService` is false fails with `voice_not_local`. |
-| `voice.on(event, listener)` | Events: `state` (`idle`, `listening`, `transcribing`, `speaking`), `level` (0 to 1, about 10 times a second), `transcript`, `error`. Returns a function that removes the listener. |
-| `voice.status()` | Each provider's state, where it runs and its download progress. |
-| `openMic({ maxMs?, minMs?, minLevel?, signal?, constraints?, onLevel?, media? })` | The microphone on its own. Returns `{ stop, cancel, done }`; `done` gives 16 kHz samples. Defaults: 30 s limit, 300 ms minimum, 0.01 silence level. |
-| `speak(text, { voice?, lang?, rate?, pitch?, volume?, localOnly?, signal?, timeoutMs? })`, `listVoices()` | Text to speech on its own. `localOnly` defaults to true. |
-| `transcriptionServer({ baseURL, model?, apiKey?, tier?, responseFormat?, timeoutMs? })` | Any server with the OpenAI `/audio/transcriptions` API. The tier comes from the URL: only `localhost`, `127.0.0.1` and `[::1]` are `local`. It sends a 16 kHz WAV file, refuses redirects, refuses a key over plain `http:` to another computer, and hides the key in errors. |
-| `whisperServer({ port?, model? })` | whisper.cpp's `whisper-server` on `127.0.0.1:8178`. |
-| `decodeAudio(blob)`, `encodeWav(samples)`, `loudness(samples)` | Audio helpers. |
-| `FoxvoiceError` | Every failure. `code` is one of `unsupported`, `mic_denied`, `no_microphone`, `mic_busy`, `busy`, `too_short`, `too_long`, `no_speech`, `bad_audio`, `aborted`, `timeout`, `bad_input`, `no_provider`, `private_mode`, `unreachable`, `auth`, `model_not_found`, `rate_limited` (with `retryAfterMs`), `http`, `insecure`, `bad_response`, `download_failed`, `out_of_memory`, `webgpu_missing`, `no_voice`, `voice_not_local`, `tts_failed`. |
+| Scope | foxvoice | annyang | Whisper Turbo |
+|---|---|---|---|
+| Main abstraction | Recording, provider routing, speech playback | Voice commands | Client-side Whisper inference |
+| Recognition mechanism | Whisper or transcription server | Browser SpeechRecognition | Whisper |
+| Configuration | JavaScript provider objects | JavaScript command map | Inference API |
 
-### `foxvoice/browser`
+## Coverage
 
-| Export | What it does |
-|---|---|
-| `whisper({ model?, device?, dtype?, language?, remoteHost?, wasmPaths? })` | Whisper in the page. Default model: `onnx-community/whisper-tiny.en` at `q8` (English only, 43 MB). `device` is `"wasm"` (default), `"webgpu"` or `"auto"`. Confidence is the mean probability that the model gave each word piece it wrote. Audio over 30 s fails with `too_long`. |
+| Integration | Status | Execution |
+|---|---|---|
+| Hugging Face Transformers.js / Whisper | ✓ implemented | Browser, WebAssembly or WebGPU |
+| whisper.cpp whisper-server | ✓ implemented wrapper | Loopback HTTP server you run |
+| OpenAI-compatible transcription API | ✓ implemented adapter | Local or cloud server you configure |
+| Browser speech synthesis | ✓ implemented | Local voices by default |
 
-To run whisper.cpp on this computer:
+The source exports three speech-provider factories: `whisper`, `whisperServer`, and `transcriptionServer`.
+`whisperServer` wraps `transcriptionServer`; these are not three independent inference engines.
+This rewrite checks source and local tests. It does not credential-check cloud services or rerun Firefox end-to-end tests.
+
+## Common use cases
+
+1. Firefox extension developers: add dictation with Transformers.js and Whisper.
+2. Agent builders: pass transcripts to foxmind and speak model replies.
+3. Local AI users: route speech to a self-hosted whisper.cpp server.
+4. Accessibility developers: read interface text through Firefox speech synthesis.
+
+## Features
+
+- **Push to talk:** `listen`, `stop`, and `cancel` control recording.
+- **Provider routing:** `only`, `prefer`, and `fallbackOnError` control selection.
+- **Audio checks:** reject silence and recordings shorter than the configured minimum.
+- **Progress:** provider status exposes model download progress.
+- **Speech playback:** select voice, language, rate, pitch, and volume.
+
+## Runtime surfaces
+
+`foxvoice` exports `createVoice`, `openMic`, `speak`, `listVoices`, `transcriptionServer`, `whisperServer`, and `FoxvoiceError`.
+Audio helpers are `SAMPLE_RATE`, `decodeAudio`, `encodeWav`, and `loudness`. TypeScript types are included.
+`foxvoice/browser` exports `whisper` and its options type.
+
+A voice exposes `listen`, `stop`, `cancel`, `transcribe`, `speak`, `on`, and `status`.
+Events are `state`, `level`, `transcript`, and `error`.
+There is no command-line interface or Model Context Protocol (MCP) server.
+
+## Delivery and behavior limits
+
+- Browser Whisper accepts at most 30 seconds per transcription. The default model is English-only `onnx-community/whisper-tiny.en`.
+- Recording defaults to 30 seconds maximum, 300 milliseconds minimum, and a 0.01 silence threshold.
+- Extension pages without cross-origin isolation use one WebAssembly thread.
+- Cancellation stops waiting for inference; ONNX Runtime cannot stop an inference midway.
+- Provider fallback after a transcription error defaults to off. There is no automatic HTTP retry loop.
+- A server probe accepts any HTTP response as reachability. It does not prove authentication or transcription works.
+- Cloud providers require `only` to include `"cloud"`. API keys belong in your application configuration, never committed files.
+- Speech playback requires an available voice. Private mode rejects voices marked as remote unless you override speech options.
+
+## Integration guides
+
+For whisper.cpp, run a server with a downloaded model:
 
 ```bash
-brew install whisper-cpp
-curl -LO https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.en.bin
 whisper-server -m ggml-tiny.en.bin --port 8178 --inference-path /v1/audio/transcriptions
 ```
 
-There is no CLI and no MCP server. Speech needs a microphone and a speaker in
-the browser, so a CLI would add little.
+Use `createVoice({ stt: [whisperServer()] })` after importing `whisperServer` from `foxvoice`.
+For other servers, pass `baseURL`, `model`, and an optional `apiKey` to `transcriptionServer`.
+There is no separate public documentation site; setup and API guidance are included here.
 
-### Demo extension
+## Status
 
-Install from AMO: [addons.mozilla.org/firefox/addon/foxvoice](https://addons.mozilla.org/firefox/addon/foxvoice/)
-(pending AMO review; the link works after approval).
+Version 0.1.2 is an early release. APIs can change before 1.0.
+Public case studies are not yet published. Report problems through the repository issue tracker if you have access.
 
-`extension/` is a small Firefox extension. The toolbar button opens a sidebar
-with a hold-to-talk button. Hold it, or hold Space on it, while you speak. The
-sidebar shows the transcript with its confidence, asks a model server on this
-computer for a reply through foxmind (private mode), and speaks the reply.
-Without a model server, the reply says so and repeats what it heard. If the
-sidebar cannot get the microphone, a button opens a setup page in a tab, where
-Firefox can show its prompt.
+### Development and demo extension
 
-Build it with `pnpm build:ext` and load `dist-ext/manifest.json` from
-`about:debugging`. For replies, start llama-server on port 8080, or set the
-server and model name in Settings (for Ollama: `http://127.0.0.1:11434/v1`).
-
-## Tests
-
-`pnpm ci:local` runs lint, typecheck, 59 unit tests and the build. The unit
-tests use a fake microphone, a fake speech engine and fake servers over real
-HTTP. `docs/failure-modes.md` lists each failure mode and its test. The tests
-went in before the code.
-
-`pnpm e2e` starts Firefox with the E2E build of the extension and gives the
-microphone `e2e/extension/jfk.wav` (11 s of John F. Kennedy's inaugural
-address, public domain, from whisper.cpp's samples) in place of a real
-microphone. It writes `artifacts/e2e-<date>.json` (the date is in UTC). Results from our
-run on 2026-10-09 (Firefox 157.0.1, Apple M3 Pro, headless, so WASM on one thread;
-28 of 28 checks passed):
-
-| Check | Result |
-|---|---|
-| Whisper tiny.en in Firefox: word error rate on jfk.wav | 0 % (punctuation aside) |
-| Confidence: speech / 3 s of noise | 0.90 / 0.02 |
-| Transcribe 11 s of audio, model loaded | 3.3 s |
-| Load the model and transcribe twice at once (files from a local copy of the hub) | 10.8 s |
-| whisper.cpp `whisper-server`, ggml-tiny.en, on this computer | 0 % word error rate, 0.2 s |
-| Private mode: requests to the cloud trap server | 0 |
-| `speak()`: first call in a fresh page / after a cancel | ends with a local voice / ends |
-| Microphone after let go, cancel and the time limit | every track `ended` |
-| Demo sidebar, opened as a tab: hold, Space, the pointer leaving the button | transcript right, reply spoken |
-
-## Firefox APIs used
-
-| API | MDN | Why |
-|---|---|---|
-| `navigator.mediaDevices.getUserMedia` | [MDN](https://developer.mozilla.org/en-US/docs/Web/API/MediaDevices/getUserMedia) | Turns the microphone on while the user holds the button. Background pages cannot use it, so foxvoice runs in the sidebar. |
-| `MediaRecorder` | [MDN](https://developer.mozilla.org/en-US/docs/Web/API/MediaRecorder) | Records the audio until the user lets go. |
-| `MediaStreamTrack.stop` | [MDN](https://developer.mozilla.org/en-US/docs/Web/API/MediaStreamTrack/stop) | Turns the microphone off on every way out. |
-| `OfflineAudioContext.decodeAudioData` | [MDN](https://developer.mozilla.org/en-US/docs/Web/API/BaseAudioContext/decodeAudioData) | Decodes the recording and resamples it to 16 kHz for Whisper. |
-| `AudioContext`, `AnalyserNode` | [MDN](https://developer.mozilla.org/en-US/docs/Web/API/AnalyserNode) | The level meter while the microphone is on. |
-| `speechSynthesis`, `SpeechSynthesisUtterance` | [MDN](https://developer.mozilla.org/en-US/docs/Web/API/SpeechSynthesis) | Speaks the reply with a voice of the operating system. `SpeechSynthesisVoice.localService` tells private mode which voices stay on the device. |
-| `<iframe>` per utterance | [MDN](https://developer.mozilla.org/en-US/docs/Web/HTML/Element/iframe) | Each iframe has its own speech queue, so a cancel cannot leave the page's queue stuck. |
-| WebAssembly, `crossOriginIsolated` | [MDN](https://developer.mozilla.org/en-US/docs/Web/API/Window/crossOriginIsolated) | ONNX Runtime runs Whisper on one WASM thread, because extension pages have no `SharedArrayBuffer`. |
-| WebGPU (`navigator.gpu.requestAdapter`) | [MDN](https://developer.mozilla.org/en-US/docs/Web/API/GPU/requestAdapter) | `device: "webgpu"` and `"auto"` check for an adapter before the download. |
-| Cache Storage | [MDN](https://developer.mozilla.org/en-US/docs/Web/API/CacheStorage) | transformers.js keeps the model files, so the download happens once. |
-| `fetch`, `FormData`, `AbortSignal.timeout`, `AbortSignal.any` | [MDN](https://developer.mozilla.org/en-US/docs/Web/API/AbortSignal/any_static) | Sends audio to a transcription server with a timeout, the caller's abort, and `redirect: "manual"`. |
-| `sidebar_action`, `sidebarAction.toggle` | [MDN](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/sidebarAction/toggle) | The push-to-talk sidebar, opened from the toolbar button. |
-| `action.onClicked` | [MDN](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/action/onClicked) | The toolbar button. |
-| `tabs.create`, `runtime.getURL` | [MDN](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/tabs/create) | Opens the microphone setup page; finds ONNX Runtime's files in the extension. |
-| `storage.local` | [MDN](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/storage/local) | Keeps the demo's settings. |
-| `host_permissions` for `http://127.0.0.1/*` | [MDN](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/manifest.json/host_permissions) | The demo calls whisper-server and the model server on this computer. |
-| `content_security_policy` with `'wasm-unsafe-eval'` | [MDN](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/manifest.json/content_security_policy) | Lets the extension compile WebAssembly. |
-| `unlimitedStorage` | [MDN](https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/manifest.json/permissions#unlimitedstorage) | Model files are tens of MB. |
-
-## Limits
-
-- **Model size.** The first `listen()` downloads Whisper tiny.en: 43 MB from
-  Hugging Face. ONNX Runtime adds 26 MB of WASM to the extension. Larger
-  models such as `onnx-community/whisper-base.en` (77 MB) work in Node with
-  transformers.js; we did not test them in Firefox.
-- **Latency.** On one WASM thread, 11 s of audio took 3.3 s on an Apple M3
-  Pro that was busy with other jobs. Slower computers take longer. There are
-  no partial transcripts while the user speaks.
-- **Language.** The default model is English only. A multilingual model and
-  the `language` option are built, but we tested only English in Firefox.
-- **30 s per turn.** Whisper reads 30 s at a time. `listen()` stops at 30 s,
-  and longer audio fails with `too_long`.
-- **Push to talk only.** There is no wake word and no voice activity
-  detection. The microphone is never on by itself.
-- **WebGPU.** `device: "webgpu"` is built but not tested. Firefox has no
-  WebGPU on Linux, Intel Macs, Android, or in headless mode.
-- **The sidebar prompt.** We did not check by hand whether Firefox shows the
-  microphone prompt for the sidebar. The setup page is the way to grant it in
-  a tab; the E2E test checks that page with Firefox's fake media device.
-- **Speech after a cancel.** Firefox 157 on macOS leaves a page's speech
-  queue stuck after `cancel()` during speech. foxvoice speaks each text in its
-  own iframe to avoid it. The E2E test checks the speech engine's events, not
-  the sound itself.
-- **Voices.** Firefox uses the voices of the operating system. On Linux it
-  needs speech-dispatcher and a voice; without one, `speak()` fails with
-  `no_voice`.
-- **Android.** Not tested. Firefox for Android has no sidebar, and Whisper on
-  one WASM thread on a phone is slow.
-- **Cloud services.** We tested `transcriptionServer()` against fake servers
-  and a real whisper.cpp server, but not against a cloud service with a real
-  key.
-- **Confidence** is the model's own word probability. It is not calibrated:
-  use it to ask the user again, not as a guarantee.
-- We ran the E2E test on macOS only.
-
-## Part of the fox primitives
-
-```mermaid
-flowchart LR
-  foxkit[foxkit] -- template --> foxvoice[foxvoice]
-  foxmind[foxmind] -- tiers and replies --> foxvoice
-  foxvoice -. voice front end .-> foxmate[foxmate]
-  foxvoice -. spoken goals .-> foxloop[foxloop]
-  click foxkit "https://github.com/pooriaarab/foxkit"
-  click foxmind "https://github.com/pooriaarab/foxmind"
-  click foxvoice "https://github.com/pooriaarab/foxvoice"
-  click foxmate "https://github.com/pooriaarab/foxmate"
-  click foxloop "https://github.com/pooriaarab/foxloop"
+```bash
+pnpm install
+pnpm ci:local
+pnpm build:ext
 ```
 
-foxvoice uses foxmind's tier names (`browser`, `local`, `cloud`), and the demo
-asks for replies through foxmind. foxmate and foxloop do not use foxvoice yet.
+Load `dist-ext/manifest.json` through Firefox `about:debugging`.
+The demo sidebar sends transcripts to a local model server through foxmind, then speaks the reply.
+The default model server uses port 8080. Configure another server in Settings.
+`pnpm e2e` runs the Firefox extension checks with recorded audio; it needs a Firefox installation.
+`ci:local` runs lint, type checks, unit tests, package and extension builds, extension lint, and add-on listing checks.
+
+## FAQ
+
+### Which integrations are verified?
+
+foxvoice includes implementations for browser Whisper, whisper.cpp, compatible transcription servers, and browser speech synthesis. Local tests cover simulated media and HTTP servers; cloud credentials were not tested for this rewrite.
+
+### Does foxvoice provide a managed speech service?
+
+foxvoice provides a library. You run local servers or configure a cloud service with your own credentials.
+
+### How is foxvoice different from annyang?
+
+foxvoice routes audio to explicit providers and controls recording and playback. [annyang](https://www.talater.com/annyang/) focuses on commands through browser speech recognition.
+
+### How is foxvoice different from Whisper Turbo?
+
+foxvoice includes microphone controls, provider routing, and speech playback. [Whisper Turbo](https://github.com/FL33TW00D/whisper-turbo) focuses on client-side Whisper inference.
+
+### Does foxvoice send audio to the cloud?
+
+foxvoice allows browser and local providers by default. Cloud transcription requires an explicit tier opt-in; browser models still download from a model hub.
+
+### Can foxvoice run without a microphone?
+
+foxvoice accepts 16 kHz mono `Float32Array` samples through `transcribe`. It also accepts a browser-decodable `Blob`.
+
+### Does foxvoice support other languages?
+
+foxvoice can load a multilingual Whisper model and accept a language code. The default English-only model rejects other language codes.
+
+### Does foxvoice retry failed requests?
+
+foxvoice does not automatically retry HTTP requests. Optional provider fallback can try another provider after eligible errors.
 
 ## License
 
-[MIT](LICENSE)
+MIT.
