@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "foxvoice \u2014 push to talk for your browser",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Speak a goal to your Firefox agent and hear the result, with speech that stays on your device.",
   "icons": {
     "48": "icons/icon-48.png",
