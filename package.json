@@ -1,6 +1,6 @@
 {
   "name": "foxvoice",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Firefox speech recognition and text-to-speech with browser Whisper, whisper.cpp, and OpenAI-compatible transcription servers.",
   "type": "module",
   "license": "MIT",
